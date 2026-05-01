@@ -6,10 +6,6 @@ import API from "../api";
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
-// react dev strict mode will mount twice, avoid double identical fetches
-let __pf_wl_key = null;
-let __pf_init_key = null;
-
 function periodToStart(p) {
   const d = new Date();
   if (p === "1W") d.setDate(d.getDate() - 7);
@@ -193,6 +189,10 @@ export default function PortfolioPage({
   const [optMetrics, setOptMetrics] = useState(null);
   const [optLoading, setOptLoading] = useState(false);
 
+  // react dev strict mode will mount twice, avoid double identical fetches
+  const wlKeyRef = useRef(null);
+  const initKeyRef = useRef(null);
+
   const totVal  = holdings.reduce((a, h) => a + h.shares * h.cur, 0);
   const totCost = holdings.reduce((a, h) => a + h.shares * h.avgPrice, 0);
   const totPL   = totVal - totCost;
@@ -244,8 +244,8 @@ export default function PortfolioPage({
       setWlLoading(false);
     }
     const key = (watchlist || []).join(",");
-    if (key && key === __pf_wl_key) return;
-    __pf_wl_key = key;
+    if (key && key === wlKeyRef.current) return;
+    wlKeyRef.current = key;
     fetchWatchlistPrices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchlist]);
@@ -289,8 +289,8 @@ export default function PortfolioPage({
 
   useEffect(() => {
     const key = `${period}|${strat}|` + (holdings || []).map(h => `${h.ticker}:${h.shares}`).join("|");
-    if (key && key === __pf_init_key) return;
-    __pf_init_key = key;
+    if (key && key === initKeyRef.current) return;
+    initKeyRef.current = key;
     fetchChart(period, holdings);
     fetchOptimize(strat, holdings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
