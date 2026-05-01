@@ -1,0 +1,35 @@
+venv/
+__pycache__/
+*.pyc
+.cache/
+.DS_Store
+.env
+node_modules/
+frontend/build/
+models/
+experiments.csv
+.claudeignore
+*.claudeignore
+AGENTS.md
+PROJECT_CONTEXT.md
+
+# python junk
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# editors
+.vscode/
+.cursor/
+
+# react / CRA
+frontend/node_modules/
+frontend/.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
