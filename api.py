@@ -16,7 +16,7 @@ from core.montecarlo import run_simulation, get_stats, get_percentile_paths, get
 from core.taxes import TAX_PRESETS, tax_summary
 from core.model import RegimeModel, smart_optimize
 
-app = FastAPI(title="Portfolio Optimizer API", version="2.0")
+app = FastAPI(title="Frontir API", version="2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,12 +29,11 @@ app.add_middleware(
 regime_model = RegimeModel()
 HERE = os.path.dirname(__file__)
 MODEL_PATH = os.path.abspath(os.path.join(HERE, "models", "regime_model.pkl"))
-if os.path.exists(MODEL_PATH):
-    try:
-        regime_model.load(MODEL_PATH)
-        print(f"[startup] model loaded from {MODEL_PATH}")
-    except Exception as e:
-        print(f"[startup] failed to load model: {e}")
+try:
+    regime_model.load(MODEL_PATH)
+    print(f"[startup] model loaded from {MODEL_PATH}")
+except Exception as e:
+    print(f"[startup] failed to load model: {e}")
 
 
 @app.exception_handler(RequestValidationError)
