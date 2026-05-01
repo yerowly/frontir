@@ -191,7 +191,6 @@ export default function PortfolioPage({
   const [chart, setChart] = useState({ values: [], dates: [] });
   const [chartLoading, setChartLoading] = useState(false);
   const [optMetrics, setOptMetrics] = useState(null);
-  const [optAlloc, setOptAlloc] = useState([]);
   const [optLoading, setOptLoading] = useState(false);
 
   const totVal  = holdings.reduce((a, h) => a + h.shares * h.cur, 0);
@@ -284,7 +283,6 @@ export default function PortfolioPage({
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setOptMetrics(data.metrics);
-      setOptAlloc(Object.entries(data.weights).map(([t, w]) => ({ t, pct: +(w * 100).toFixed(1) })));
     } catch (e) { console.error("optimize fetch:", e); }
     setOptLoading(false);
   }
