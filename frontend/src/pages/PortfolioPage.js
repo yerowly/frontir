@@ -301,7 +301,7 @@ export default function PortfolioPage({
   function handlePeriod(p) { setPeriod(p); fetchChart(p, holdings); }
   function handleStrat(s)  { setStrat(s);  fetchOptimize(s, holdings); }
 
-  const allocColors = makeAllocColors(optAlloc.length);
+  // const allocColors = makeAllocColors(optAlloc.length);
 
   const bx  = (extra = {}) => ({ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, ...extra });
   const lbl = text => (

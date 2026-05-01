@@ -242,6 +242,7 @@ function DrawdownChart({ values, dates, color = C.red }) {
       ctx.fillStyle = C.red; ctx.shadowColor = C.red; ctx.shadowBlur = 6;
       ctx.fill(); ctx.shadowBlur = 0;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, cw, tip, color]);
 
   const onMove = e => {
