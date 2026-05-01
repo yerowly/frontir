@@ -4,7 +4,7 @@ Small personal project for portfolio optimization + backtesting.
 
 - Backend: FastAPI (`api.py`)
 - Frontends:
-  - React (`frontend/`) talks to the backend at `http://localhost:8000`
+  - React (`frontend/`) talks to the backend at `REACT_APP_API_URL` (or `http://localhost:8000`)
   - Streamlit (`app.py`) is a simple legacy UI
 - Core logic: `core/*.py`
 
@@ -37,6 +37,14 @@ npm start
 ```
 
 Open `http://localhost:3000`.
+
+#### Frontend API URL
+
+By default the frontend uses `http://localhost:8000`.
+
+To point it to a deployed backend, set:
+
+- `REACT_APP_API_URL=https://frontir.onrender.com`
 
 ### Streamlit (optional)
 
