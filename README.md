@@ -1,4 +1,4 @@
-# Portfolio Optimizer
+# Frontir
 
 Small personal project for portfolio optimization + backtesting.
 

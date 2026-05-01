@@ -25,7 +25,7 @@ GOLDEN_SHA256 = "90149df61a632ad19ce6f9a2b97fcb575ccbf86d02d8ac677415edbfd8d1efc
 
 MODEL_URL = os.environ.get(
     "MODEL_URL",
-    "https://github.com/factb/portfolio_optimizer/releases/latest/download/regime_model.pkl",
+    "https://github.com/yerowly/frontir/releases/latest/download/regime_model.pkl",
 )
 
 
