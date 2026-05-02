@@ -43,7 +43,7 @@ function Spark({ uid, data, w = 64, h = 24, pos = true }) {
   );
 }
 
-function Chart({ values, dates, loading }) {
+function Chart({ values, dates, loading, narrow }) {
   const cRef = useRef(null), wRef = useRef(null);
   const [tip, setTip] = useState(null);
   const [cw, setCw] = useState(600);
@@ -56,7 +56,7 @@ function Chart({ values, dates, loading }) {
 
   useEffect(() => {
     const cv = cRef.current; if (!cv) return;
-    const W = cw, H = 260, dpr = window.devicePixelRatio || 1;
+    const W = cw, H = narrow ? 220 : 260, dpr = window.devicePixelRatio || 1;
     cv.width = W * dpr; cv.height = H * dpr;
     cv.style.width = W + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
@@ -68,7 +68,8 @@ function Chart({ values, dates, loading }) {
       return;
     }
 
-    const pad = { t: 16, r: 12, b: 24, l: 60 };
+    const padL = narrow ? 36 : 60, padR = narrow ? 6 : 12;
+    const pad = { t: narrow ? 12 : 16, r: padR, b: narrow ? 18 : 24, l: padL };
     const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
     const mn = Math.min(...values) * 0.98, mx = Math.max(...values) * 1.02;
     const tx = i => pad.l + (i / (values.length - 1)) * iw;
@@ -80,7 +81,7 @@ function Chart({ values, dates, loading }) {
       ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
       ctx.fillStyle = C.textFaint; ctx.font = `400 10px ${FONT}`; ctx.textAlign = "right";
       const val = mx - ((mx - mn) / 4) * i;
-      ctx.fillText(val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val.toFixed(0)}`, pad.l - 6, y + 3);
+      ctx.fillText(val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val.toFixed(0)}`, padL - 6, y + 3);
     }
 
     const g = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
@@ -109,24 +110,26 @@ function Chart({ values, dates, loading }) {
       ctx.beginPath(); ctx.arc(cx2, cy2, 5, 0, Math.PI * 2);
       ctx.fillStyle = C.accent; ctx.shadowColor = C.accent; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
     }
-  }, [values, cw, tip, loading]);
+  }, [values, cw, tip, loading, narrow]);
+
+  const pl = narrow ? 36 : 60, pr = narrow ? 6 : 12;
 
   const onMove = e => {
     if (!values || values.length < 2) return;
     const r = cRef.current.getBoundingClientRect();
     const x = e.clientX - r.left;
-    const idx = Math.round(((x - 60) / (r.width - 60 - 12)) * (values.length - 1));
+    const idx = Math.round(((x - pl) / (r.width - pl - pr)) * (values.length - 1));
     if (idx >= 0 && idx < values.length) setTip(idx);
   };
 
   return (
-    <div ref={wRef} style={{ position: "relative", width: "100%" }}>
+    <div ref={wRef} style={{ position: "relative", width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       <canvas ref={cRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)}
-        style={{ cursor: "crosshair", width: "100%", display: "block" }} />
+        style={{ cursor: "crosshair", width: "100%", display: "block", maxWidth: "100%" }} />
       {tip !== null && values && tip < values.length && (
         <div style={{
           position: "absolute", top: 4,
-          left: Math.min((tip / (values.length - 1)) * (cw - 72) + 60, cw - 140),
+          left: Math.min((tip / (values.length - 1)) * (cw - pl - pr) + pl, cw - 140),
           background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8,
           padding: "6px 12px", pointerEvents: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
         }}>
@@ -429,9 +432,8 @@ export default function PortfolioPage({
               narrow
                 ? {
                     display: "flex",
+                    flexDirection: "column",
                     gap: 0,
-                    overflowX: "auto",
-                    WebkitOverflowScrolling: "touch",
                     borderTop: watchlist.length ? `1px solid ${C.border}` : undefined,
                   }
                 : { display: "grid", gridTemplateColumns: `repeat(${watchlist.length}, 1fr)` }
@@ -444,9 +446,9 @@ export default function PortfolioPage({
                 return (
                   <div key={ticker} style={{
                     padding: "14px 16px", position: "relative",
-                    borderRight: i < watchlist.length - 1 ? `1px solid ${C.border}` : "none",
+                    borderRight: !narrow && i < watchlist.length - 1 ? `1px solid ${C.border}` : "none",
+                    borderBottom: narrow && i < watchlist.length - 1 ? `1px solid ${C.border}` : "none",
                     transition: "background 0.15s",
-                    ...(narrow ? { flex: "0 0 auto", minWidth: 148 } : {}),
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = C.surfaceHover; setWlHover(ticker); }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; setWlHover(null); }}>
@@ -534,8 +536,8 @@ export default function PortfolioPage({
         gap: narrow ? 12 : 14,
         marginBottom: 18,
       }}>
-        <div style={bx()}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ ...bx(), minWidth: 0, maxWidth: "100%" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             {lbl("Performance")}
             <div style={{ display: "flex", gap: 2 }}>
               {["1W", "1M", "3M", "1Y", "ALL"].map(pp => {
@@ -552,10 +554,10 @@ export default function PortfolioPage({
               })}
             </div>
           </div>
-          <Chart values={chart.values} dates={chart.dates} loading={chartLoading} />
+          <Chart values={chart.values} dates={chart.dates} loading={chartLoading} narrow={narrow} />
         </div>
 
-        <div style={bx()}>
+        <div style={{ ...bx(), minWidth: 0, maxWidth: "100%" }}>
           {lbl("Allocation")}
           {holdings.length === 0 ? (
             <div style={{ color: C.textDim, fontSize: 12, textAlign: "center", padding: "60px 0", fontFamily: FONT }}>
@@ -658,8 +660,79 @@ export default function PortfolioPage({
       {/* HOLDINGS */}
       <div style={bx()}>
         {lbl("Holdings")}
-        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: narrow ? 560 : undefined }}>
+        {narrow ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {holdings.map((h, i) => {
+              const pl  = (h.cur - h.avgPrice) * h.shares;
+              const pct = ((h.cur - h.avgPrice) / h.avgPrice) * 100;
+              const wt  = totVal > 0 ? (h.shares * h.cur / totVal) * 100 : 0;
+              const pos = pl >= 0;
+              return (
+                <div
+                  key={`${h.ticker}-${i}`}
+                  style={{
+                    padding: "12px 0",
+                    borderBottom: i < holdings.length - 1 ? `1px solid ${C.border}` : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                      <TickerLogo ticker={h.ticker} size={26} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: C.text }}>{h.ticker}</div>
+                        <div style={{
+                          fontSize: 9, color: C.textDim, fontWeight: 300,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "72vw",
+                        }}>{h.name || h.ticker}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onRemove && onRemove(h.ticker)}
+                      title={`Remove ${h.ticker}`}
+                      style={{
+                        width: 28, height: 28, borderRadius: 6, border: "none",
+                        background: "transparent", color: C.textDim, cursor: "pointer",
+                        fontSize: 16, lineHeight: 1, flexShrink: 0,
+                      }}
+                    >×</button>
+                  </div>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                    gap: 8,
+                    fontSize: 10,
+                    color: C.textMid,
+                    fontFamily: FONT,
+                  }}>
+                    <div><span style={{ color: C.textDim }}>Shares</span>{" "}{h.shares}</div>
+                    <div style={{ textAlign: "right" }}><span style={{ color: C.textDim }}>Avg</span>{" "}${h.avgPrice.toFixed(2)}</div>
+                    <div><span style={{ color: C.textDim }}>Now</span>{" "}<span style={{ color: C.text, fontWeight: 600 }}>${h.cur.toFixed(2)}</span></div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ color: C.textDim }}>P&amp;L</span>{" "}
+                      <span style={{ color: pos ? C.green : C.red, fontWeight: 600 }}>
+                        {pos ? "+" : ""}${Math.abs(pl).toLocaleString("en", { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, color: pos ? C.green : C.red,
+                        background: pos ? C.greenDim : C.redDim, padding: "2px 6px", borderRadius: 4,
+                      }}>{pos ? "+" : ""}{pct.toFixed(1)}%</span>
+                    </div>
+                    <div style={{ textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+                      <div style={{ width: 36, height: 3, background: C.border, borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ width: `${wt}%`, height: "100%", background: C.accent, opacity: 0.5 }} />
+                      </div>
+                      <span style={{ color: C.textDim, fontWeight: 500 }}>{wt.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead>
             <tr>
               {["Asset", "Shares", "Avg Price", "Current", "P&L", "Change", "Weight", ""].map((h, i) => (
@@ -728,7 +801,7 @@ export default function PortfolioPage({
             })}
           </tbody>
         </table>
-        </div>
+        )}
         <div style={{ padding: "12px 0 4px" }}>
           <button onClick={onAdd} style={{
             display: "flex", alignItems: "center", gap: 6,

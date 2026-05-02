@@ -58,7 +58,7 @@ function Donut({ data, colors, size = 120 }) {
   );
 }
 
-function FrontierChart({ data }) {
+function FrontierChart({ data, narrow }) {
   const cRef = useRef(null), wRef = useRef(null);
   const [cw, setCw] = useState(600);
   const [tooltip, setTooltip] = useState(null);
@@ -71,13 +71,15 @@ function FrontierChart({ data }) {
 
   useEffect(() => {
     const cv = cRef.current; if (!cv || !data) return;
-    const W = cw, H = 340, dpr = window.devicePixelRatio || 1;
+    const W = cw, H = narrow ? 280 : 340, dpr = window.devicePixelRatio || 1;
     cv.width = W * dpr; cv.height = H * dpr;
     cv.style.width = W + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, W, H);
 
-    const pad = { t: 20, r: 20, b: 40, l: 56 };
+    const pad = narrow
+      ? { t: 14, r: 10, b: 28, l: 40 }
+      : { t: 20, r: 20, b: 40, l: 56 };
     const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
 
     const { returns: rets, volatilities: vols, sharpes } = data.random_portfolios;
@@ -108,9 +110,9 @@ function FrontierChart({ data }) {
     }
 
     // Axis labels
-    ctx.fillStyle = C.textDim; ctx.font = `400 10px ${FONT}`; ctx.textAlign = "center";
+    ctx.fillStyle = C.textDim; ctx.font = `${narrow ? 9 : 10}px ${FONT}`; ctx.textAlign = "center";
     ctx.fillText("Volatility →", pad.l + iw / 2, H - 2);
-    ctx.save(); ctx.translate(12, pad.t + ih / 2); ctx.rotate(-Math.PI / 2);
+    ctx.save(); ctx.translate(narrow ? 10 : 12, pad.t + ih / 2); ctx.rotate(-Math.PI / 2);
     ctx.fillText("Return →", 0, 0); ctx.restore();
 
     // Sharpe color scale: map to green
@@ -137,15 +139,17 @@ function FrontierChart({ data }) {
       ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
       ctx.strokeStyle = "#0b0b12"; ctx.lineWidth = 1.5; ctx.stroke();
     }
-  }, [data, cw]);
+  }, [data, cw, narrow]);
 
   const onMove = e => {
     if (!data) return;
     const r = cRef.current.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
-    // Check proximity to optimal points
-    const pad = { t: 20, r: 20, b: 40, l: 56 };
-    const iw = cw - pad.l - pad.r, ih = 340 - pad.t - pad.b;
+    const pad = narrow
+      ? { t: 14, r: 10, b: 28, l: 40 }
+      : { t: 20, r: 20, b: 40, l: 56 };
+    const Hc = narrow ? 280 : 340;
+    const iw = cw - pad.l - pad.r, ih = Hc - pad.t - pad.b;
     const { returns: rets, volatilities: vols } = data.random_portfolios;
     const allVols = [...vols, ...Object.values(data.optimal).map(o => o.volatility)];
     const allRets = [...rets, ...Object.values(data.optimal).map(o => o.return)];
@@ -166,9 +170,9 @@ function FrontierChart({ data }) {
   };
 
   return (
-    <div ref={wRef} style={{ position: "relative", width: "100%" }}>
+    <div ref={wRef} style={{ position: "relative", width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       <canvas ref={cRef} onMouseMove={onMove} onMouseLeave={() => setTooltip(null)}
-        style={{ display: "block", width: "100%", cursor: "crosshair" }} />
+        style={{ display: "block", width: "100%", maxWidth: "100%", cursor: "crosshair" }} />
       {tooltip && (
         <div style={{
           position: "absolute",
@@ -191,10 +195,11 @@ function FrontierChart({ data }) {
 }
 
 // SVG correlation heatmap
-function Heatmap({ tickers, matrix }) {
+function Heatmap({ tickers, matrix, narrow }) {
   const n = tickers.length;
-  const cell = Math.min(56, Math.floor(360 / n));
-  const labelW = 44;
+  const labelW = narrow ? 34 : 44;
+  const budget = narrow ? 300 : 380;
+  const cell = Math.max(9, Math.min(narrow ? 44 : 56, Math.floor((budget - labelW) / Math.max(n, 1))));
   const totalW = labelW + n * cell;
   const totalH = labelW + n * cell;
 
@@ -209,7 +214,7 @@ function Heatmap({ tickers, matrix }) {
   }
 
   return (
-    <svg width={totalW} height={totalH} style={{ display: "block", maxWidth: "100%" }}>
+    <svg width={totalW} height={totalH} style={{ display: "block", maxWidth: "100%", height: "auto" }}>
       {/* Column labels */}
       {tickers.map((t, i) => (
         <text key={`cl-${t}`}
@@ -471,7 +476,7 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
           </div>
         ) : (
           <>
-            <FrontierChart data={frontier} />
+            <FrontierChart data={frontier} narrow={narrow} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
               {Object.entries(frontier.optimal).map(([id, pt]) => (
                 <div key={id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -526,14 +531,16 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
               {loading ? "Computing…" : "Run analysis to compare strategies"}
             </div>
           ) : (
-            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: narrow ? 420 : undefined }}>
+            <table style={{
+              width: "100%", borderCollapse: "collapse", tableLayout: "fixed",
+            }}>
               <thead>
                 <tr>
-                  {["Strategy", "Return", "Volatility", "Sharpe", "Max DD"].map((h, i) => (
+                  {["Strategy", "Return", "Vol", "Sharpe", "Max DD"].map((h, i) => (
                     <th key={h} style={{
-                      textAlign: i === 0 ? "left" : "right", padding: "8px 12px",
-                      fontSize: 11, color: C.textDim, fontWeight: 500,
+                      textAlign: i === 0 ? "left" : "right",
+                      padding: narrow ? "6px 4px" : "8px 12px",
+                      fontSize: narrow ? 9 : 11, color: C.textDim, fontWeight: 500,
                       borderBottom: `1px solid ${C.border}`,
                     }}>{h}</th>
                   ))}
@@ -544,6 +551,8 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                   const m = s.metrics;
                   const col = STRAT_COLORS[id] || C.accent;
                   const isRec = id === bestStratId;
+                  const cp = narrow ? "6px 4px" : "11px 12px";
+                  const fs = narrow ? 10 : 13;
                   return (
                     <tr key={id} style={{
                       transition: "background 0.1s",
@@ -552,37 +561,39 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                       onMouseEnter={e => e.currentTarget.style.background = C.surfaceHover}
                       onMouseLeave={e => e.currentTarget.style.background = isRec ? "rgba(45,212,160,0.04)" : "transparent"}>
                       <td style={{
-                        padding: "11px 12px", borderBottom: `1px solid ${C.border}`,
+                        padding: cp, borderBottom: `1px solid ${C.border}`,
                         borderLeft: isRec ? `2px solid ${C.accent}` : "2px solid transparent",
+                        overflow: "hidden",
                       }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: narrow ? 4 : 8, flexWrap: "wrap" }}>
                           <div style={{ width: 8, height: 8, borderRadius: "50%", background: col, flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, fontWeight: 500, color: C.text, fontFamily: FONT }}>
+                          <span style={{ fontSize: fs, fontWeight: 500, color: C.text, fontFamily: FONT,
+                            wordBreak: "break-word" }}>
                             {STRAT_LABELS[id] || id}
                           </span>
                           {isRec && (
                             <span style={{
-                              fontSize: 9, fontWeight: 600, color: C.accent,
-                              background: C.accentDim, padding: "2px 6px",
+                              fontSize: narrow ? 8 : 9, fontWeight: 600, color: C.accent,
+                              background: C.accentDim, padding: "2px 5px",
                               borderRadius: 4, letterSpacing: "0.05em",
-                            }}>BEST ({bestLabel()})</span>
+                            }}>{narrow ? "BEST" : `BEST (${bestLabel()})`}</span>
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: "11px 12px", textAlign: "right", borderBottom: `1px solid ${C.border}`,
-                        color: C.green, fontWeight: 500, fontFamily: FONT }}>
+                      <td style={{ padding: cp, textAlign: "right", borderBottom: `1px solid ${C.border}`,
+                        color: C.green, fontWeight: 500, fontFamily: FONT, fontSize: fs }}>
                         +{(m.annual_return * 100).toFixed(1)}%
                       </td>
-                      <td style={{ padding: "11px 12px", textAlign: "right", borderBottom: `1px solid ${C.border}`,
-                        color: C.textMid, fontFamily: FONT }}>
+                      <td style={{ padding: cp, textAlign: "right", borderBottom: `1px solid ${C.border}`,
+                        color: C.textMid, fontFamily: FONT, fontSize: fs }}>
                         {(m.volatility * 100).toFixed(1)}%
                       </td>
-                      <td style={{ padding: "11px 12px", textAlign: "right", borderBottom: `1px solid ${C.border}`,
-                        color: C.accent, fontWeight: 600, fontFamily: FONT }}>
+                      <td style={{ padding: cp, textAlign: "right", borderBottom: `1px solid ${C.border}`,
+                        color: C.accent, fontWeight: 600, fontFamily: FONT, fontSize: fs }}>
                         {m.sharpe.toFixed(3)}
                       </td>
-                      <td style={{ padding: "11px 12px", textAlign: "right", borderBottom: `1px solid ${C.border}`,
-                        color: C.red, fontFamily: FONT }}>
+                      <td style={{ padding: cp, textAlign: "right", borderBottom: `1px solid ${C.border}`,
+                        color: C.red, fontFamily: FONT, fontSize: fs }}>
                         {(m.max_drawdown * 100).toFixed(1)}%
                       </td>
                     </tr>
@@ -590,7 +601,6 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                 })}
               </tbody>
             </table>
-            </div>
           )}
         </div>
 
@@ -603,8 +613,8 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
             </div>
           ) : (
             <>
-              <div style={{ overflowX: "auto" }}>
-                <Heatmap tickers={corr.tickers} matrix={corr.matrix} />
+              <div style={{ width: "100%", maxWidth: "100%", overflow: "hidden" }}>
+                <Heatmap tickers={corr.tickers} matrix={corr.matrix} narrow={narrow} />
               </div>
               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
                 <div style={{ width: 40, height: 6, borderRadius: 3,
@@ -736,7 +746,7 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                       letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: FONT }}>
                       {title}
                     </div>
-                    <Donut data={alloc} colors={rbColors} size={120} />
+                    <Donut data={alloc} colors={rbColors} size={narrow ? 104 : 120} />
                     <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
                       {alloc.map((a, i) => (
                         <div key={a.t} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -750,12 +760,66 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                 ))}
               </div>
 
-              {/* Rebalancing table */}
-              <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", borderRadius: 10, border: `1px solid ${C.border}` }}>
-              <div style={{ minWidth: narrow ? 520 : undefined, borderRadius: 10, overflow: "hidden" }}>
+              {/* Rebalancing */}
+              {narrow ? (
+                <div style={{ borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                  {rbRows.map((row, ri) => {
+                    const isBuy  = row.action === "buy";
+                    const isSell = row.action === "sell";
+                    const isOk   = row.action === "ok";
+                    const actionColor = isBuy ? C.green : isSell ? C.red : C.textDim;
+                    const actionBg    = isBuy ? C.greenDim : isSell ? C.redDim : "transparent";
+                    return (
+                      <div key={row.ticker} style={{
+                        padding: "12px 12px",
+                        borderBottom: ri < rbRows.length - 1 ? `1px solid ${C.border}` : "none",
+                        background: C.bg,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                          <TickerLogo ticker={row.ticker} size={26} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, fontFamily: FONT }}>{row.ticker}</div>
+                            <div style={{ fontSize: 9, color: C.textDim, fontFamily: FONT,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "78vw" }}>
+                              {row.name}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{
+                          display: "grid", gridTemplateColumns: "1fr 1fr",
+                          gap: 6, fontSize: 10, color: C.textMid, fontFamily: FONT, marginBottom: 8,
+                        }}>
+                          <div>Current <strong style={{ color: C.text }}>{row.curPct.toFixed(1)}%</strong></div>
+                          <div style={{ textAlign: "right" }}>Target <strong style={{ color: C.accent }}>{row.optPct.toFixed(1)}%</strong></div>
+                        </div>
+                        {isOk ? (
+                          <span style={{ fontSize: 11, color: C.textDim, fontFamily: FONT }}>✓ No change</span>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: actionColor, marginBottom: 6 }}>
+                              Δ {isBuy ? "+" : ""}{(row.optPct - row.curPct).toFixed(1)}pp
+                            </div>
+                            <span style={{
+                              display: "inline-block", padding: "3px 8px", borderRadius: 5,
+                              fontSize: 10, fontWeight: 600, background: actionBg,
+                              color: actionColor, fontFamily: FONT,
+                            }}>
+                              {isBuy ? "BUY" : "SELL"} ${Math.abs(row.diffDollar).toLocaleString("en", { maximumFractionDigits: 0 })}
+                            </span>
+                            <div style={{ fontSize: 9, color: C.textDim, fontFamily: FONT, marginTop: 6 }}>
+                              {isSell ? "Sell" : "Buy"} {row.diffShares.toFixed(1)} sh @ ${row.cur.toFixed(2)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+              <div style={{ borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
                 <div style={{
                   display: "grid", gridTemplateColumns: "1fr 100px 100px 90px 190px",
-                  background: C.bg, borderBottom: `1px solid ${C.border}`, padding: narrow ? "9px 10px" : "9px 16px",
+                  background: C.bg, borderBottom: `1px solid ${C.border}`, padding: "9px 16px",
                 }}>
                   {["Asset", "Current", "Optimal", "Change", "Action"].map((h, i) => (
                     <div key={h} style={{
@@ -829,7 +893,7 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                   );
                 })}
               </div>
-              </div>
+              )}
             </>
           )}
         </div>

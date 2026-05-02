@@ -25,7 +25,7 @@ function calcDrawdown(values) {
 }
 
 
-function MultiLineChart({ series, loading }) {
+function MultiLineChart({ series, loading, narrow }) {
   const cRef = useRef(null), wRef = useRef(null);
   const [tip, setTip] = useState(null);
   const [cw, setCw]   = useState(700);
@@ -38,7 +38,7 @@ function MultiLineChart({ series, loading }) {
 
   useEffect(() => {
     const cv = cRef.current; if (!cv) return;
-    const W = cw, H = 280, dpr = window.devicePixelRatio || 1;
+    const W = cw, H = narrow ? 240 : 280, dpr = window.devicePixelRatio || 1;
     cv.width = W * dpr; cv.height = H * dpr;
     cv.style.width = W + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
@@ -63,7 +63,8 @@ function MultiLineChart({ series, loading }) {
     const pad_mx = mx > 0 ? mx * 1.08 :  2;
     const len = series[0].values.length;
 
-    const pad = { t: 14, r: 14, b: 30, l: 58 };
+    const padL = narrow ? 42 : 58;
+    const pad = { t: narrow ? 12 : 14, r: narrow ? 8 : 14, b: narrow ? 26 : 30, l: padL };
     const iw  = W - pad.l - pad.r;
     const ih  = H - pad.t - pad.b;
     const tx  = i => pad.l + (i / (len - 1)) * iw;
@@ -77,7 +78,7 @@ function MultiLineChart({ series, loading }) {
       ctx.strokeStyle = C.border; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
       ctx.fillStyle = C.textFaint; ctx.font = `400 10px ${FONT}`; ctx.textAlign = "right";
-      ctx.fillText(`${v >= 0 ? "+" : ""}${v.toFixed(0)}%`, pad.l - 5, y + 3);
+      ctx.fillText(`${v >= 0 ? "+" : ""}${v.toFixed(0)}%`, padL - 5, y + 3);
     }
 
     // Zero line
@@ -119,13 +120,15 @@ function MultiLineChart({ series, loading }) {
         ctx.fill(); ctx.shadowBlur = 0;
       }
     }
-  }, [series, cw, tip, loading]);
+  }, [series, cw, tip, loading, narrow]);
+
+  const pl = narrow ? 42 : 58, pr = narrow ? 8 : 14;
 
   const onMove = e => {
     if (!series?.length) return;
     const r   = cRef.current.getBoundingClientRect();
     const len = series[0].values.length;
-    const idx = Math.round(((e.clientX - r.left - 58) / (r.width - 58 - 14)) * (len - 1));
+    const idx = Math.round(((e.clientX - r.left - pl) / (r.width - pl - pr)) * (len - 1));
     if (idx >= 0 && idx < len) setTip(idx);
   };
 
@@ -138,13 +141,13 @@ function MultiLineChart({ series, loading }) {
     : [];
 
   return (
-    <div ref={wRef} style={{ position: "relative", width: "100%" }}>
+    <div ref={wRef} style={{ position: "relative", width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       <canvas ref={cRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)}
-        style={{ cursor: "crosshair", width: "100%", display: "block" }} />
+        style={{ cursor: "crosshair", width: "100%", display: "block", maxWidth: "100%" }} />
       {tip !== null && series?.length > 0 && (
         <div style={{
           position: "absolute", top: 8,
-          left: Math.min((tip / (series[0].values.length - 1)) * (cw - 72) + 58, cw - 176),
+          left: Math.min((tip / (series[0].values.length - 1)) * (cw - pl - pr) + pl, cw - 176),
           background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 8,
           padding: "8px 12px", pointerEvents: "none", boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           minWidth: 164, zIndex: 10,
@@ -522,16 +525,16 @@ export default function BacktestPage({ holdings = [], onAdd }) {
       {results && results.length > 0 && (
         <div style={{ ...bx(), marginBottom: 16 }}>
           {lbl("Results")}
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: narrow ? "fixed" : "auto" }}>
             <thead>
               <tr>
-                {["Strategy", "Ann. Return", "Volatility", "Sharpe", "Max Drawdown", "Total Commission"].map((h, i) => (
+                {["Strategy", "Ann. Ret.", "Vol", "Sharpe", "Max DD", "Comm."].map((h, i) => (
                   <th key={h} style={{
                     textAlign: i === 0 ? "left" : "right",
-                    padding: "7px 14px",
-                    fontSize: 11, color: C.textDim, fontWeight: 500,
+                    padding: narrow ? "6px 4px" : "7px 14px",
+                    fontSize: narrow ? 9 : 11, color: C.textDim, fontWeight: 500,
                     borderBottom: `1px solid ${C.border}`, fontFamily: FONT,
-                    whiteSpace: "nowrap",
+                    whiteSpace: narrow ? "normal" : "nowrap",
                   }}>{h}</th>
                 ))}
               </tr>
@@ -549,13 +552,14 @@ export default function BacktestPage({ holdings = [], onAdd }) {
                   }}
                   onMouseEnter={e => { if (!sel) e.currentTarget.style.background = C.surfaceHover; }}
                   onMouseLeave={e => { if (!sel) e.currentTarget.style.background = "transparent"; }}>
-                    <td style={{ padding: "11px 14px", borderBottom: `1px solid ${C.border}` }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <td style={{ padding: narrow ? "8px 4px" : "11px 14px", borderBottom: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: narrow ? 6 : 10 }}>
                         <span style={{ width: 10, height: 10, borderRadius: 3,
                           background: color, flexShrink: 0, boxShadow: sel ? `0 0 6px ${color}55` : "none" }} />
                         <span style={{
-                          fontSize: 13, fontWeight: sel ? 600 : 500,
+                          fontSize: narrow ? 11 : 13, fontWeight: sel ? 600 : 500,
                           color: sel ? C.text : C.textMid, fontFamily: FONT,
+                          wordBreak: "break-word",
                         }}>{name}</span>
                         {sel && (
                           <span style={{ fontSize: 10, color: color, fontFamily: FONT,
@@ -565,26 +569,30 @@ export default function BacktestPage({ holdings = [], onAdd }) {
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "11px 14px", textAlign: "right",
+                    <td style={{ padding: narrow ? "8px 4px" : "11px 14px", textAlign: "right",
                       borderBottom: `1px solid ${C.border}`, fontFamily: FONT,
+                      fontSize: narrow ? 10 : undefined,
                       color: r.annual_return >= 0 ? C.green : C.red, fontWeight: 600 }}>
                       {r.annual_return >= 0 ? "+" : ""}{(r.annual_return * 100).toFixed(1)}%
                     </td>
-                    <td style={{ padding: "11px 14px", textAlign: "right",
-                      borderBottom: `1px solid ${C.border}`, color: C.textMid, fontFamily: FONT }}>
+                    <td style={{ padding: narrow ? "8px 4px" : "11px 14px", textAlign: "right",
+                      borderBottom: `1px solid ${C.border}`, color: C.textMid, fontFamily: FONT,
+                      fontSize: narrow ? 10 : undefined }}>
                       {(r.volatility * 100).toFixed(1)}%
                     </td>
-                    <td style={{ padding: "11px 14px", textAlign: "right",
+                    <td style={{ padding: narrow ? "8px 4px" : "11px 14px", textAlign: "right",
                       borderBottom: `1px solid ${C.border}`, color: C.accent,
-                      fontWeight: 600, fontFamily: FONT }}>
+                      fontWeight: 600, fontFamily: FONT, fontSize: narrow ? 10 : undefined }}>
                       {r.sharpe.toFixed(3)}
                     </td>
-                    <td style={{ padding: "11px 14px", textAlign: "right",
-                      borderBottom: `1px solid ${C.border}`, color: C.red, fontFamily: FONT }}>
+                    <td style={{ padding: narrow ? "8px 4px" : "11px 14px", textAlign: "right",
+                      borderBottom: `1px solid ${C.border}`, color: C.red, fontFamily: FONT,
+                      fontSize: narrow ? 10 : undefined }}>
                       {(r.max_drawdown * 100).toFixed(1)}%
                     </td>
-                    <td style={{ padding: "11px 14px", textAlign: "right",
-                      borderBottom: `1px solid ${C.border}`, color: C.textDim, fontFamily: FONT }}>
+                    <td style={{ padding: narrow ? "8px 4px" : "11px 14px", textAlign: "right",
+                      borderBottom: `1px solid ${C.border}`, color: C.textDim, fontFamily: FONT,
+                      fontSize: narrow ? 10 : undefined }}>
                       {(r.total_commission * 100).toFixed(3)}%
                     </td>
                   </tr>
@@ -615,7 +623,7 @@ export default function BacktestPage({ holdings = [], onAdd }) {
                 </div>
               ))}
             </div>
-            <MultiLineChart series={chartSeries} loading={loading} />
+            <MultiLineChart series={chartSeries} loading={loading} narrow={narrow} />
           </div>
 
           {/* Drawdown */}
