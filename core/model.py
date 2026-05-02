@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -6,7 +7,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import f1_score
 from sklearn.utils.class_weight import compute_sample_weight
 import pickle
-import os
 import hashlib
 import urllib.request
 
@@ -19,7 +19,7 @@ HERE = os.path.dirname(__file__)
 MODEL_DIR = os.path.abspath(os.path.join(HERE, "..", "models"))
 
 
-GOLDEN_SHA256 = "90149df61a632ad19ce6f9a2b97fcb575ccbf86d02d8ac677415edbfd8d1efc9"
+GOLDEN_SHA256 = "08f12c9a7e96a6161fdd6ab76b1be80e43d7acb9048f45c636c0d4183e318141"
 
 # TODO: add VIX (or VIX9D) as a separate panic signal
 
@@ -62,7 +62,7 @@ def _safe_z(x, w=63):
     return (x - m) / (s + 1e-8)
 
 
-def make_features(returns, use_macro=True):
+def make_features(returns, use_macro=True, use_news=False):
     port_ret = returns.mean(axis=1)
     cum = (1 + port_ret).cumprod()
 
@@ -72,21 +72,53 @@ def make_features(returns, use_macro=True):
         df[f"ret_{w}d"] = port_ret.rolling(w).mean()
         df[f"vol_{w}d"] = port_ret.rolling(w).std()
 
+    df["ret_3d"] = port_ret.rolling(3).mean()
+    df["vol_3d"] = port_ret.rolling(3).std()
+
     df["momentum_21"] = port_ret.rolling(21).sum()
     df["momentum_63"] = port_ret.rolling(63).sum()
+
+    df["momentum_ratio_5_21"] = df["ret_5d"] / (df["ret_21d"] + 1e-8)
+    df["momentum_acceleration"] = df["ret_5d"] - df["ret_21d"]
 
     df["vol_ratio"] = df["vol_5d"] / (df["vol_21d"] + 1e-8)
 
     rolling_max = cum.rolling(63).max()
     df["drawdown_63"] = (cum - rolling_max) / (rolling_max + 1e-8)
 
+    h21 = cum.rolling(21).max()
+    l21 = cum.rolling(21).min()
+    df["dist_from_21d_high"] = (cum - h21) / (h21 + 1e-8)
+    df["dist_from_21d_low"] = (cum - l21) / (l21 + 1e-8)
+
+    h252 = cum.rolling(252).max()
+    l252 = cum.rolling(252).min()
+    df["dist_from_252d_high"] = (cum - h252) / (h252 + 1e-8)
+    df["dist_from_252d_low"] = (cum - l252) / (l252 + 1e-8)
+
     df["pct_up_21"] = port_ret.rolling(21).apply(lambda x: (x > 0).mean())
     df["pct_up_63"] = port_ret.rolling(63).apply(lambda x: (x > 0).mean())
+
+    df["ewm_ret_21"] = port_ret.ewm(span=21, adjust=False).mean()
+    df["ewm_ret_5"] = port_ret.ewm(span=5, adjust=False).mean()
+    df["ewm_vol_21"] = port_ret.ewm(span=21, adjust=False).std()
 
     if returns.shape[1] > 1:
         up_frac = (returns > 0).mean(axis=1)
         df["breadth_21"] = up_frac.rolling(21).mean()
         df["breadth_63"] = up_frac.rolling(63).mean()
+
+        r5 = (1 + returns).rolling(5).apply(np.prod, raw=True) - 1
+        r21 = (1 + returns).rolling(21).apply(np.prod, raw=True) - 1
+        df["pct_positive_5d"] = (r5 > 0).mean(axis=1)
+        df["pct_positive_21d"] = (r21 > 0).mean(axis=1)
+
+        df["breadth_divergence"] = port_ret - returns.median(axis=1)
+
+        disp = returns.std(axis=1)
+        df["dispersion_1d"] = disp
+        df["dispersion_5d"] = disp.rolling(5).mean()
+        df["dispersion_21d"] = disp.rolling(21).mean()
 
     if returns.shape[1] > 1:
         corr_values = []
@@ -100,9 +132,18 @@ def make_features(returns, use_macro=True):
             upper = corr[np.triu_indices(n, k=1)]
             corr_values.append(np.nanmean(upper))
         df["mean_corr"] = corr_values
+        mc = df["mean_corr"]
+        df["corr_shock_21"] = mc - mc.rolling(21).mean()
+        df["corr_z_63"] = _safe_z(mc, 63)
 
     df["vol_z_63"] = _safe_z(df["vol_21d"], 63)
     df["vol_of_vol_63"] = df["vol_21d"].rolling(63).std()
+
+    v21 = df["vol_21d"]
+    v21_m = v21.rolling(252).mean()
+    v21_s = v21.rolling(252).std()
+    df["vol_zscore"] = (v21 - v21_m) / (v21_s + 1e-8)
+    df["vol_percentile"] = v21.rolling(252).apply(lambda x: float((x <= x[-1]).mean()), raw=True)
 
     avg_gain_21 = port_ret.clip(lower=0).rolling(21).mean()
     avg_loss_21 = (-port_ret.clip(upper=0)).rolling(21).mean()
@@ -122,24 +163,45 @@ def make_features(returns, use_macro=True):
             df["spy_tlt_spread_21"] = (spy - tlt).rolling(21).mean()
             df["spy_tlt_corr_63"] = spy.rolling(63).corr(tlt)
 
+            spy21 = (1 + spy).rolling(21).apply(np.prod, raw=True)
+            tlt21 = (1 + tlt).rolling(21).apply(np.prod, raw=True)
+            df["stock_bond_ratio"] = spy21 / (tlt21 + 1e-8)
+
         if "HYG" in cols and "IEF" in cols:
             df["credit_spread_21"] = (returns["HYG"] - returns["IEF"]).rolling(21).mean()
+
+        if "GLD" in cols:
+            df["gold_momentum_21"] = returns["GLD"].rolling(21).sum()
+
+    if use_news:
+        # NOTE: news features must be aligned to dates (no lookahead).
+        try:
+            from core.news_features import merge_news_into_features
+            df = merge_news_into_features(df)
+        except Exception as e:
+            print(f"news features skipped: {e}")
 
     return df.dropna()
 
 
 
-def label_regimes(returns, forward_days=21, z=0.35, vol_window=21, panic_q=0.90):
+def label_regimes(returns, forward_days=21, z=0.35, vol_window=21, panic_q=0.90, thr_mult=0.6):
     port_ret = returns.mean(axis=1)
 
     future_sum = port_ret.shift(-forward_days).rolling(forward_days).sum()
     future_std = port_ret.shift(-forward_days).rolling(forward_days).std()
     score = future_sum / (future_std * np.sqrt(forward_days) + 1e-8)
 
+    # Adaptive threshold: wider in high-vol regimes, tighter in low-vol regimes.
+    # Use a 252d rolling std of the forward-return signal; early period falls back to `z`.
+    thr = score.rolling(252, min_periods=252).std() * float(thr_mult)
+    if z is not None:
+        thr = thr.fillna(float(z))
+
     labels = pd.Series(np.nan, index=returns.index)
-    labels[score < -z] = 0  # bear
-    labels[score > z] = 2   # bull
-    labels[(score >= -z) & (score <= z)] = 1  # sideways
+    labels[score < -thr] = 0  # bear
+    labels[score > thr] = 2   # bull
+    labels[(score >= -thr) & (score <= thr)] = 1  # sideways
 
     vol_now = port_ret.rolling(vol_window).std()
     vol_thr = vol_now.expanding(min_periods=252).quantile(panic_q).shift(1)
@@ -231,14 +293,20 @@ class RegimeModel:
         self.is_trained = False
         self.feature_names = None
 
-    def train(self, returns, mode="regime", forward_days=21, embargo=None, n_splits=5):
+    def _make_features(self, returns):
+        use_news = bool(os.environ.get("NEWS_FEATURES_CSV"))
+        if self.feature_names:
+            use_news = use_news or any(str(x).startswith("news_") for x in self.feature_names)
+        return make_features(returns, use_news=use_news)
+
+    def train(self, returns, mode="regime", forward_days=21, embargo=None, n_splits=5, thr_mult=0.6):
         print("generating features...")
-        features = make_features(returns)
+        features = self._make_features(returns)
         self.feature_names = list(features.columns)
 
         if mode == "regime":
             print("labeling regimes...")
-            labels = label_regimes(returns, forward_days=forward_days)
+            labels = label_regimes(returns, forward_days=forward_days, thr_mult=thr_mult)
         else:
             print("labeling best strategies (this takes a while)...")
             labels = label_best_strategy(returns)
@@ -255,7 +323,7 @@ class RegimeModel:
         X_scaled = self.scaler.fit_transform(X)
 
         if embargo is None:
-            embargo = forward_days if mode == "regime" else 21
+            embargo = 63
 
         splits = make_walkforward_splits(len(X_scaled), n_splits=n_splits, embargo=embargo)
         scores = []
@@ -305,7 +373,7 @@ class RegimeModel:
         if not self.is_trained:
             raise ValueError("train() model first, dummy")
 
-        features = make_features(returns)
+        features = self._make_features(returns)
         if len(features) == 0:
             return 1  # sideways по умолчанию
 
@@ -318,37 +386,64 @@ class RegimeModel:
         regime_names = {0: "bear", 1: "sideways", 2: "bull", 3: "panic"}
         return regime_names.get(int(prediction), "sideways")
 
-    def predict_regime_safe(self, returns, min_conf=0.45):
+    def predict_regime_safe(self, returns, min_conf=0.4, smooth_days=0, hysteresis_days=0):
+        from collections import Counter
+
         if not self.is_trained:
             return "sideways", {}
 
-        features = make_features(returns)
+        features = self._make_features(returns)
         if len(features) == 0:
             return "sideways", {}
 
         if self.feature_names:
             features = features.reindex(columns=self.feature_names, fill_value=0)
-        last_features = features.iloc[[-1]]
-        X = self.scaler.transform(last_features)
 
-        probs = self.regime_model.predict_proba(X)[0]
+        X = self.scaler.transform(features)
+        probs_all = self.regime_model.predict_proba(X)
         classes = list(self.regime_model.classes_)
-        best_i = int(np.argmax(probs))
-        best_p = float(probs[best_i])
-
         regime_names = {0: "bear", 1: "sideways", 2: "bull", 3: "panic"}
-        conf = {regime_names.get(int(c), str(c)): float(p) for c, p in zip(classes, probs)}
 
-        if best_p < min_conf:
+        pred_cls = []
+        for row in range(len(probs_all)):
+            pr = probs_all[row]
+            bi = int(np.argmax(pr))
+            pred_cls.append(int(classes[bi]))
+
+        sm = max(int(smooth_days), 1)
+        hz = int(hysteresis_days)
+
+        probs_last = probs_all[-1]
+        conf = {regime_names.get(int(c), str(c)): float(p) for c, p in zip(classes, probs_last)}
+
+        if hz > 1:
+            tail_hz = pred_cls[-hz:]
+            if len(set(tail_hz)) != 1:
+                return "sideways", conf
+
+        if sm > 1:
+            win = pred_cls[-sm:]
+            chosen_id = Counter(win).most_common(1)[0][0]
+        else:
+            chosen_id = pred_cls[-1]
+
+        ix = None
+        for j, c in enumerate(classes):
+            if int(c) == int(chosen_id):
+                ix = j
+                break
+        p_chosen = float(probs_last[ix]) if ix is not None else 0.0
+
+        if p_chosen < float(min_conf):
             return "sideways", conf
 
-        return regime_names.get(int(classes[best_i]), "sideways"), conf
+        return regime_names.get(int(chosen_id), "sideways"), conf
 
     def predict_strategy(self, returns):
         if not self.is_trained:
             raise ValueError("model isnt trained")
 
-        features = make_features(returns)
+        features = self._make_features(returns)
         if len(features) == 0:
             return "equal"
 
@@ -359,7 +454,7 @@ class RegimeModel:
         return self.strategy_model.predict(X)[0]
 
     def get_confidence(self, returns):
-        features = make_features(returns)
+        features = self._make_features(returns)
         if len(features) == 0:
             return {}
 
@@ -427,10 +522,12 @@ class RegimeModel:
 
 
 def backtest_regime_switching(returns, train_months=24, rebalance_months=1,
-                              rf_rate=0.045, commission=0.001, min_conf=0.45,
+                              rf_rate=0.045, commission=0.001, min_conf=0.4,
                               forward_days=21, z=0.35, vol_window=21, panic_q=0.90,
                               model_type="histgb", feats_all=None, labels_all=None,
-                              max_rebalances=None, print_every=6):
+                              max_rebalances=None, print_every=6,
+                              thr_mult=0.6, smooth_days=0, hysteresis_days=0,
+                              conf_entry=0.55, conf_exit=0.25):
     # walk-forward like core.backtest, but strategy chosen by regime
     dates = returns.index
     test_start = dates[0] + pd.DateOffset(months=train_months)
@@ -444,6 +541,7 @@ def backtest_regime_switching(returns, train_months=24, rebalance_months=1,
     current = test_start
     prev_weights = None
     n_reb = 0
+    prev_rg = None
 
     regime_strategy = {
         "bull": "max_return",
@@ -466,7 +564,7 @@ def backtest_regime_switching(returns, train_months=24, rebalance_months=1,
 
     def fit_fast(m, train):
         if feats_all is None:
-            feats = make_features(train)
+            feats = make_features(train, use_news=bool(os.environ.get("NEWS_FEATURES_CSV")))
         else:
             feats = feats_all.loc[train.index[0]:train.index[-1]]
 
@@ -477,6 +575,7 @@ def backtest_regime_switching(returns, train_months=24, rebalance_months=1,
                 z=z,
                 vol_window=vol_window,
                 panic_q=panic_q,
+                thr_mult=thr_mult,
             )
         else:
             labels = labels_all.loc[train.index[0]:train.index[-1]].dropna()
@@ -520,7 +619,45 @@ def backtest_regime_switching(returns, train_months=24, rebalance_months=1,
             print(f"  rebalance {n_reb}, date={str(current.date())}, train_days={len(train)}", flush=True)
 
         # decide regime on latest available slice (train)
-        rg, conf = m.predict_regime_safe(train, min_conf=min_conf)
+        rg, conf = m.predict_regime_safe(
+            train,
+            min_conf=0.0,
+            smooth_days=smooth_days,
+            hysteresis_days=hysteresis_days,
+        )
+
+        # Two-threshold confidence gate:
+        # - enter a new regime only if its prob >= conf_entry
+        # - keep current regime while its prob >= conf_exit
+        # This reduces churn without hard majority-vote lag.
+        try:
+            p_rg = float(conf.get(rg, 0.0))
+        except Exception:
+            p_rg = 0.0
+
+        if prev_rg is None:
+            if p_rg < float(conf_entry):
+                rg = "sideways"
+        else:
+            if rg != prev_rg:
+                if p_rg < float(conf_entry):
+                    rg = prev_rg
+            else:
+                try:
+                    p_prev = float(conf.get(prev_rg, 0.0))
+                except Exception:
+                    p_prev = 0.0
+                if p_prev < float(conf_exit):
+                    rg = "sideways"
+
+        # Final global min_conf fallback (kept for backwards compatibility)
+        try:
+            if float(conf.get(rg, 0.0)) < float(min_conf):
+                rg = "sideways"
+        except Exception:
+            pass
+
+        prev_rg = rg
         strat = regime_strategy.get(rg, "max_sharpe")
 
         mu, cov = annual_stats(train)
@@ -583,7 +720,7 @@ def backtest_regime_switching(returns, train_months=24, rebalance_months=1,
 
 def smart_optimize(returns, mean_ret, cov_mat, model=None, rf_rate=0.045):
     if model is not None and model.is_trained:
-        regime, confidence = model.predict_regime_safe(returns, min_conf=0.45)
+        regime, confidence = model.predict_regime_safe(returns, min_conf=0.4)
 
         regime_strategy = {
             "bull": "max_return",     
@@ -632,8 +769,9 @@ if __name__ == "__main__":
     returns = calc_returns(prices)
     print(f"days: {len(returns)}")
 
-    feats = make_features(returns)
-    labels = label_regimes(returns, forward_days=forward_days, z=z)
+    use_news = bool(os.environ.get("NEWS_FEATURES_CSV"))
+    feats = make_features(returns, use_news=use_news)
+    labels = label_regimes(returns, forward_days=forward_days, z=z, thr_mult=0.6)
     idx = feats.index.intersection(labels.index)
     X = feats.loc[idx]
     y = labels.loc[idx]
