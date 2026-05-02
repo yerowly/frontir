@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C, FONT } from "../theme";
+import { useLayout, padPage } from "../layout";
 import TickerLogo from "../TickerLogo";
 import API from "../api";
 
@@ -245,6 +246,7 @@ function Heatmap({ tickers, matrix }) {
 }
 
 export default function OptimizerPage({ holdings = [], onAdd }) {
+  const { narrow } = useLayout();
   const [startDate,    setStartDate]   = useState("2020-01-01");
   const [loading,      setLoading]     = useState(false);
   const [error,        setError]       = useState(null);
@@ -400,7 +402,7 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
   }).sort((a, b) => Math.abs(b.optPct - b.curPct) - Math.abs(a.optPct - a.curPct)) : [];
 
   return (
-    <div style={{ padding: "20px 28px 40px" }}>
+    <div style={{ padding: padPage(narrow) }}>
 
       {/* CONTROLS */}
       <div style={{ ...bx({ marginBottom: 18 }) }}>
@@ -489,11 +491,21 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
       </div>
 
       {/* STRATEGY COMPARISON + CORRELATION */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: narrow ? "1fr" : "1fr auto",
+        gap: narrow ? 16 : 14,
+      }}>
 
         {/* STRATEGY TABLE */}
         <div style={bx()}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: narrow ? "wrap" : "nowrap",
+            gap: narrow ? 10 : 0,
+          }}>
             {lbl("Strategy Comparison")}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: -6 }}>
               <span style={{ fontSize: 10, color: C.textFaint, fontFamily: FONT }}>BEST by</span>
@@ -514,7 +526,8 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
               {loading ? "Computing…" : "Run analysis to compare strategies"}
             </div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: narrow ? 420 : undefined }}>
               <thead>
                 <tr>
                   {["Strategy", "Return", "Volatility", "Sharpe", "Max DD"].map((h, i) => (
@@ -577,6 +590,7 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
@@ -703,7 +717,12 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
               })()}
 
               {/* Two donuts */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: narrow ? "1fr" : "1fr 1fr",
+                gap: 14,
+                marginBottom: 20,
+              }}>
                 {[
                   { title: "Current Allocation", alloc: rbCurAlloc },
                   { title: `Optimal — ${STRAT_LABELS[rebalStrat]}`, alloc: rbOptAlloc },
@@ -732,10 +751,11 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
               </div>
 
               {/* Rebalancing table */}
-              <div style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+              <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", borderRadius: 10, border: `1px solid ${C.border}` }}>
+              <div style={{ minWidth: narrow ? 520 : undefined, borderRadius: 10, overflow: "hidden" }}>
                 <div style={{
                   display: "grid", gridTemplateColumns: "1fr 100px 100px 90px 190px",
-                  background: C.bg, borderBottom: `1px solid ${C.border}`, padding: "9px 16px",
+                  background: C.bg, borderBottom: `1px solid ${C.border}`, padding: narrow ? "9px 10px" : "9px 16px",
                 }}>
                   {["Asset", "Current", "Optimal", "Change", "Action"].map((h, i) => (
                     <div key={h} style={{
@@ -808,6 +828,7 @@ export default function OptimizerPage({ holdings = [], onAdd }) {
                     </div>
                   );
                 })}
+              </div>
               </div>
             </>
           )}

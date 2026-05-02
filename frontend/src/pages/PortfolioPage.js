@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C, FONT } from "../theme";
+import { useLayout, padPage } from "../layout";
 import { STRATS, TICKERS, filterTickers } from "../data";
 import TickerLogo from "../TickerLogo";
 import API from "../api";
@@ -174,6 +175,7 @@ export default function PortfolioPage({
   onAddToWatchlist,
   onRemoveFromWatchlist,
 }) {
+  const { narrow } = useLayout();
   const [strat, setStrat] = useState("max_sharpe");
   const [wlOpen, setWlOpen]     = useState(true);
   const [wlAdding, setWlAdding] = useState(false);
@@ -333,7 +335,7 @@ export default function PortfolioPage({
   }
 
   return (
-    <div style={{ padding: "20px 28px 40px" }}>
+    <div style={{ padding: padPage(narrow) }}>
 
       {/* WATCHLIST */}
       <div style={{ ...bx({ padding: 0, marginBottom: 18 }) }}>
@@ -358,16 +360,18 @@ export default function PortfolioPage({
                 placeholder="Search ticker…"
                 autoComplete="off"
                 style={{
-                  width: 190, background: C.bg, border: `1px solid ${C.accent}`,
+                  width: narrow ? "min(190px, 42vw)" : 190, maxWidth: "100%",
+                  background: C.bg, border: `1px solid ${C.accent}`,
                   borderRadius: 6, padding: "4px 10px", color: C.text, fontFamily: FONT,
-                  fontSize: 12, outline: "none",
+                  fontSize: 12, outline: "none", boxSizing: "border-box",
                 }}
                 onChange={e => { setWlQuery(e.target.value); setWlShowDrop(true); }}
                 onBlur={() => setTimeout(() => { setWlAdding(false); setWlShowDrop(false); setWlQuery(""); }, 160)}
               />
               {wlShowDrop && (
                 <div style={{
-                  position: "absolute", top: "calc(100% + 3px)", right: 0, width: 300,
+                  position: "absolute", top: "calc(100% + 3px)", right: 0,
+                  width: narrow ? "min(300px, calc(100vw - 40px))" : 300,
                   zIndex: 200, background: "#13131e", border: `1px solid ${C.borderHover}`,
                   borderRadius: 8, overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
                 }}>
@@ -421,7 +425,17 @@ export default function PortfolioPage({
               Watchlist is empty — click <strong style={{ color: C.accent }}>+</strong> to add tickers
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${watchlist.length}, 1fr)` }}>
+            <div style={
+              narrow
+                ? {
+                    display: "flex",
+                    gap: 0,
+                    overflowX: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    borderTop: watchlist.length ? `1px solid ${C.border}` : undefined,
+                  }
+                : { display: "grid", gridTemplateColumns: `repeat(${watchlist.length}, 1fr)` }
+            }>
               {watchlist.map((ticker, i) => {
                 const d   = wlData[ticker];
                 const pos = d ? d.change >= 0 : true;
@@ -432,6 +446,7 @@ export default function PortfolioPage({
                     padding: "14px 16px", position: "relative",
                     borderRight: i < watchlist.length - 1 ? `1px solid ${C.border}` : "none",
                     transition: "background 0.15s",
+                    ...(narrow ? { flex: "0 0 auto", minWidth: 148 } : {}),
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = C.surfaceHover; setWlHover(ticker); }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; setWlHover(null); }}>
@@ -497,7 +512,12 @@ export default function PortfolioPage({
       </div>
 
       {/* METRICS */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 18 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: narrow ? "repeat(2, minmax(0, 1fr))" : "repeat(4, 1fr)",
+        gap: narrow ? 10 : 14,
+        marginBottom: 18,
+      }}>
         {metricsCards.map((c, i) => (
           <div key={i} style={{ ...bx(), animation: `fadeUp 0.4s ease ${i * 0.06}s backwards` }}>
             <div style={{ fontSize: 11, color: C.textDim, fontWeight: 400, marginBottom: 10 }}>{c.l}</div>
@@ -508,7 +528,12 @@ export default function PortfolioPage({
       </div>
 
       {/* CHART + ALLOCATION */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 270px", gap: 14, marginBottom: 18 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: narrow ? "1fr" : "1fr 270px",
+        gap: narrow ? 12 : 14,
+        marginBottom: 18,
+      }}>
         <div style={bx()}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             {lbl("Performance")}
@@ -561,7 +586,12 @@ export default function PortfolioPage({
       {/* STRATEGY */}
       <div style={{ marginBottom: 18 }}>
         {lbl("Strategy")}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 10 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: narrow ? "repeat(2, minmax(0, 1fr))" : "repeat(5, 1fr)",
+          gap: narrow ? 8 : 10,
+          marginBottom: 10,
+        }}>
           {STRATS.map(s => {
             const a = strat === s.id;
             return (
@@ -582,8 +612,26 @@ export default function PortfolioPage({
           })}
         </div>
         {optMetrics && (
-          <div style={{ display: "flex", gap: 0, background: C.accentDim,
-            border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={
+            narrow
+              ? {
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: 1,
+                  background: C.border,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                }
+              : {
+                  display: "flex",
+                  gap: 0,
+                  background: C.accentDim,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                }
+          }>
             {[
               ["Annual Return", `+${(optMetrics.annual_return * 100).toFixed(1)}%`, C.green],
               ["Volatility",    `${(optMetrics.volatility * 100).toFixed(1)}%`,      C.textMid],
@@ -592,11 +640,15 @@ export default function PortfolioPage({
               ["Max Drawdown",  `${(optMetrics.max_drawdown * 100).toFixed(1)}%`,     C.red],
             ].map(([label, value, color], i, arr) => (
               <div key={label} style={{
-                flex: 1, textAlign: "center", padding: "12px 8px",
-                borderRight: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                flex: narrow ? undefined : 1,
+                textAlign: "center",
+                padding: narrow ? "10px 8px" : "12px 8px",
+                background: narrow ? C.accentDim : undefined,
+                borderRight: !narrow && i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                boxSizing: "border-box",
               }}>
                 <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, fontFamily: FONT }}>{label}</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color, fontFamily: FONT }}>{value}</div>
+                <div style={{ fontSize: narrow ? 14 : 15, fontWeight: 600, color, fontFamily: FONT }}>{value}</div>
               </div>
             ))}
           </div>
@@ -606,7 +658,8 @@ export default function PortfolioPage({
       {/* HOLDINGS */}
       <div style={bx()}>
         {lbl("Holdings")}
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: narrow ? 560 : undefined }}>
           <thead>
             <tr>
               {["Asset", "Shares", "Avg Price", "Current", "P&L", "Change", "Weight", ""].map((h, i) => (
@@ -675,6 +728,7 @@ export default function PortfolioPage({
             })}
           </tbody>
         </table>
+        </div>
         <div style={{ padding: "12px 0 4px" }}>
           <button onClick={onAdd} style={{
             display: "flex", alignItems: "center", gap: 6,

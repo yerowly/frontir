@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C, FONT } from "../theme";
+import { useLayout, padPage } from "../layout";
 import TickerLogo from "../TickerLogo";
 import API from "../api";
 
@@ -263,6 +264,7 @@ function DistributionHistogram({ histogram, initialInvestment, median }) {
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function MonteCarloPage({ holdings = [] }) {
+  const { narrow } = useLayout();
   const [strategy,     setStrategy]     = useState("max_sharpe");
   const [simDays,      setSimDays]      = useState(252);
   const [numSims,      setNumSims]      = useState(3000);
@@ -349,7 +351,7 @@ export default function MonteCarloPage({ holdings = [] }) {
   ] : [];
 
   return (
-    <div style={{ padding: "20px 28px 40px", fontFamily: FONT }}>
+    <div style={{ padding: padPage(narrow), fontFamily: FONT }}>
       <style>{`
         .mc-range {
           -webkit-appearance: none; appearance: none;
@@ -437,7 +439,12 @@ export default function MonteCarloPage({ holdings = [] }) {
         </div>
 
         {/* Inputs grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr", gap: 20, marginBottom: 24 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: narrow ? "1fr" : "160px 1fr 1fr",
+          gap: narrow ? 16 : 20,
+          marginBottom: 24,
+        }}>
 
           {/* History start date */}
           <div>
@@ -540,7 +547,10 @@ export default function MonteCarloPage({ holdings = [] }) {
         <>
           {/* Stats cards */}
           <div style={{
-            display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 16,
+            display: "grid",
+            gridTemplateColumns: narrow ? "repeat(2, minmax(0, 1fr))" : "repeat(5, 1fr)",
+            gap: 12,
+            marginBottom: 16,
           }}>
             {statCards.map(card => (
               <div key={card.label} style={{
@@ -630,7 +640,12 @@ export default function MonteCarloPage({ holdings = [] }) {
           )}
 
           {/* Scenario cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: narrow ? "1fr" : "1fr 1fr 1fr",
+            gap: 12,
+            marginBottom: 16,
+          }}>
             {[
               {
                 label: "Worst Case", sub: "5th percentile",
@@ -708,7 +723,12 @@ export default function MonteCarloPage({ holdings = [] }) {
             </button>
             {detailsOpen && (
               <div style={{ marginTop: 18 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: narrow ? "1fr" : "1fr 1fr",
+                  gap: 12,
+                  marginBottom: 12,
+                }}>
                   {[
                     { label: "Mean",     value: fmtDollar(stats.mean) },
                     { label: "Std Dev",  value: fmtDollar(stats.std) },
@@ -727,7 +747,12 @@ export default function MonteCarloPage({ holdings = [] }) {
                 <div style={{ fontSize: 11, color: C.textDim, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 10, fontFamily: FONT }}>
                   Percentiles
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 16 }}>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: narrow ? "repeat(2, minmax(0, 1fr))" : "repeat(5, 1fr)",
+                  gap: 8,
+                  marginBottom: 16,
+                }}>
                   {[
                     { p: "5th",  v: stats.percentile_5,  color: "#f0506e" },
                     { p: "25th", v: stats.percentile_25, color: "#f59e0b" },
@@ -749,7 +774,11 @@ export default function MonteCarloPage({ holdings = [] }) {
                 <div style={{ fontSize: 11, color: C.textDim, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 10, fontFamily: FONT }}>
                   Probability Analysis
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: narrow ? "1fr" : "repeat(3, 1fr)",
+                  gap: 10,
+                }}>
                   {[
                     { label: "Prob. of Loss",     value: stats.prob_loss,     color: stats.prob_loss > 0.3 ? C.red : stats.prob_loss > 0.15 ? "#f59e0b" : C.accent },
                     { label: "Prob. Gain > 10%",  value: stats.prob_gain_10,  color: stats.prob_gain_10 > 0.5 ? C.accent : "#f59e0b" },

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { C, FONT } from "../theme";
+import { useLayout, padPage } from "../layout";
 import API from "../api";
 
 const REGIME_CFG = {
@@ -67,6 +68,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 let __model_autorun_once = false;
 
 export default function ModelPage({ holdings = [] }) {
+  const { narrow } = useLayout();
   const [startDate,   setStartDate]   = useState("2020-01-01");
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState(null);
@@ -127,7 +129,7 @@ export default function ModelPage({ holdings = [] }) {
   const donutColors = makeColors(donutData.length);
 
   return (
-    <div style={{ padding: "20px 28px 40px", fontFamily: FONT }}>
+    <div style={{ padding: padPage(narrow), fontFamily: FONT }}>
       <style>{`
         @keyframes mdl-spin { to { transform: rotate(360deg); } }
       `}</style>
@@ -256,7 +258,7 @@ export default function ModelPage({ holdings = [] }) {
             background: rc.bg, border: `1px solid ${rc.border}`,
           }}>
             <div style={{
-              fontSize: 56, fontWeight: 800, letterSpacing: "0.1em",
+              fontSize: narrow ? 38 : 56, fontWeight: 800, letterSpacing: "0.1em",
               color: rc.color, fontFamily: FONT,
               textShadow: `0 0 24px ${rc.color}22`,
               lineHeight: 1,
@@ -272,7 +274,12 @@ export default function ModelPage({ holdings = [] }) {
           </div>
 
           {/* Confidence + Strategy row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: narrow ? "1fr" : "1fr 1fr",
+            gap: 16,
+            marginBottom: 16,
+          }}>
 
             {/* Confidence breakdown */}
             <div style={{ ...bx() }}>

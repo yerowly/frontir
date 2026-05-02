@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C, FONT } from "../theme";
+import { useLayout, padPage } from "../layout";
 import { STRATS } from "../data";
 import TickerLogo from "../TickerLogo";
 import API from "../api";
@@ -276,6 +277,7 @@ function DrawdownChart({ values, dates, color = C.red }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function BacktestPage({ holdings = [], onAdd }) {
+  const { narrow } = useLayout();
   const [startDate,    setStartDate]    = useState("2020-01-01");
   const [endDate,      setEndDate]      = useState(today());
   const [trainMonths,  setTrainMonths]  = useState(12);
@@ -343,7 +345,7 @@ export default function BacktestPage({ holdings = [], onAdd }) {
   };
 
   return (
-    <div style={{ padding: "20px 28px 40px", fontFamily: FONT }}>
+    <div style={{ padding: padPage(narrow), fontFamily: FONT }}>
       <style>{`
         .bt-range {
           -webkit-appearance: none; appearance: none;
@@ -399,7 +401,12 @@ export default function BacktestPage({ holdings = [], onAdd }) {
         </div>
 
         {/* Date range + sliders in one responsive grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 20, marginBottom: 24 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: narrow ? "repeat(auto-fill, minmax(148px, 1fr))" : "1fr 1fr 1fr 1fr 1fr",
+          gap: narrow ? 14 : 20,
+          marginBottom: 24,
+        }}>
           {/* Start date */}
           <div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 6, fontFamily: FONT }}>Start date</div>
@@ -590,7 +597,11 @@ export default function BacktestPage({ holdings = [], onAdd }) {
 
       {/* ── CHARTS ──────────────────────────────────────────────────────── */}
       {results && results.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 14 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: narrow ? "1fr" : "1fr 360px",
+          gap: 14,
+        }}>
 
           {/* Cumulative returns */}
           <div style={bx()}>

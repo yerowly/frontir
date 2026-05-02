@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { C, FONT } from "./theme";
+import { LayoutCtx, NARROW_MAX } from "./layout";
 import { HOLDINGS } from "./data";
 import AddPositionModal from "./AddPositionModal";
 import PortfolioPage  from "./pages/PortfolioPage";
@@ -57,6 +58,10 @@ const REGIME_STYLE = {
 
 export default function App() {
   const [page, setPage]           = useState("portfolio");
+  const [narrow, setNarrow]       = useState(
+    typeof window !== "undefined" ? window.innerWidth <= NARROW_MAX : false
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [modal, setModal]         = useState(false);
   const [holdings, setHoldings]   = useState(HOLDINGS);
   const [watchlist, setWatchlist] = useState(["BTC-USD", "ETH-USD", "SPY", "TSLA", "SOL-USD"]);
@@ -117,6 +122,25 @@ export default function App() {
   }, [page]);
 
   useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${NARROW_MAX}px)`);
+    const on = () => {
+      setNarrow(mq.matches);
+      if (!mq.matches) setDrawerOpen(false);
+    };
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
+  useEffect(() => {
+    if (narrow && drawerOpen) {
+      const o = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = o; };
+    }
+  }, [narrow, drawerOpen]);
+
+  useEffect(() => {
     const tickers = HOLDINGS.map(h => h.ticker);
     if (tickers.length < 2) return;
     const end = new Date().toISOString().slice(0, 10);
@@ -168,8 +192,17 @@ export default function App() {
     setWatchlist(prev => prev.filter(t => t !== ticker));
   }
 
+  const goNav = (id) => {
+    setPage(id);
+    if (narrow) setDrawerOpen(false);
+  };
+
   return (
-    <div style={{ fontFamily: FONT, background: C.bg, color: C.text, minHeight: "100vh", display: "flex", fontSize: 13 }}>
+    <LayoutCtx.Provider value={{ narrow }}>
+    <div style={{
+      fontFamily: FONT, background: C.bg, color: C.text, minHeight: "100vh", display: "flex",
+      fontSize: narrow ? 12 : 13, maxWidth: "100vw", overflow: "hidden",
+    }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Stack+Sans+Text:wght@200..700&display=swap');
         *{margin:0;padding:0;box-sizing:border-box}
@@ -179,21 +212,39 @@ export default function App() {
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
       `}</style>
 
+      {narrow && drawerOpen && (
+        <div
+          onClick={() => setDrawerOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1001,
+            background: "rgba(0,0,0,0.5)",
+          }}
+        />
+      )}
+
       {/* SIDEBAR */}
       <aside style={{
-        width: 210, borderRight: `1px solid ${C.border}`, padding: "20px 0",
+        width: narrow ? 222 : 210,
+        borderRight: narrow ? "none" : `1px solid ${C.border}`,
+        padding: "20px 0",
         display: "flex", flexDirection: "column", flexShrink: 0,
         background: "linear-gradient(180deg, #0e0e18 0%, #0b0b12 100%)",
+        ...(narrow ? {
+          position: "fixed", left: 0, top: 0, height: "100vh", zIndex: 1002,
+          transform: drawerOpen ? "translateX(0)" : "translateX(-105%)",
+          transition: "transform 0.22s ease",
+          boxShadow: drawerOpen ? "8px 0 40px rgba(0,0,0,0.45)" : "none",
+        } : {}),
       }}>
         <div style={{ padding: "0 20px", marginBottom: 32, textAlign: "center" }}>
-          <img src="/logo_alt.svg" alt="logo" style={{ width: 170, height: "auto" }} />
+          <img src="/logo_alt.svg" alt="" style={{ width: narrow ? 150 : 170, height: "auto" }} />
         </div>
 
         <nav style={{ flex: 1 }}>
           {NAV.map(n => {
             const a = page === n.id;
             return (
-              <button key={n.id} onClick={() => setPage(n.id)} style={{
+              <button key={n.id} onClick={() => goNav(n.id)} style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%",
                 padding: "10px 20px", border: "none", cursor: "pointer",
                 background: a ? C.accentDim : "transparent",
@@ -245,18 +296,34 @@ export default function App() {
       </aside>
 
       {/* MAIN */}
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         <header style={{
-          padding: "12px 28px", borderBottom: `1px solid ${C.border}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: narrow ? "10px 14px" : "12px 28px", borderBottom: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
           background: "rgba(14,14,24,0.5)", backdropFilter: "blur(12px)", flexShrink: 0,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <span style={{ fontSize: 12, color: C.textDim, fontWeight: 400 }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+          <div style={{ display: "flex", alignItems: "center", gap: narrow ? 10 : 20, minWidth: 0, flex: 1 }}>
+            {narrow && (
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(o => !o)}
+                aria-label="Open menu"
+                style={{
+                  width: 44, minWidth: 44, height: 44, borderRadius: 10, border: `1px solid ${C.border}`,
+                  background: C.surface, color: C.text, cursor: "pointer", fontSize: 20, lineHeight: 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}
+              >☰</button>
+            )}
+            <span style={{ fontSize: narrow ? 11 : 12, color: C.textDim, fontWeight: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {new Date().toLocaleDateString("en-US", { weekday: narrow ? undefined : "short", month: "short", day: "numeric", year: narrow ? "2-digit" : "numeric" })}
             </span>
-            <div style={{ width: 1, height: 14, background: C.border }} />
-            <span style={{ fontSize: 12, color: C.textDim, fontWeight: 400 }}>{holdings.length} positions</span>
+            {!narrow && (
+              <>
+                <div style={{ width: 1, height: 14, background: C.border, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: C.textDim, fontWeight: 400 }}>{holdings.length} positions</span>
+              </>
+            )}
           </div>
           {page === "portfolio" && (
             <button onClick={() => setModal(true)} style={{
@@ -284,9 +351,9 @@ export default function App() {
         </div>
 
         <div style={{
-          padding: "12px 28px",
+          padding: narrow ? "12px 14px" : "12px 28px",
           borderTop: `1px solid ${C.border}`,
-          fontSize: 10,
+          fontSize: narrow ? 9 : 10,
           color: C.textFaint,
           lineHeight: 1.6,
         }}>
@@ -296,5 +363,6 @@ export default function App() {
 
       <AddPositionModal open={modal} onClose={() => setModal(false)} onAdd={handleAddPosition} />
     </div>
+    </LayoutCtx.Provider>
   );
 }

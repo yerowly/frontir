@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { C, FONT } from "./theme";
+import { NARROW_MAX } from "./layout";
 import TickerLogo from "./TickerLogo";
 import API from "./api";
 
@@ -14,6 +15,17 @@ export default function AddPositionModal({ open, onClose, onAdd }) {
   const [results, setResults]       = useState([]);
   const sharesRef = useRef(null);
   const searchRef = useRef(null);
+  const [narrow, setNarrow] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= NARROW_MAX : false
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${NARROW_MAX}px)`);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -95,14 +107,22 @@ export default function AddPositionModal({ open, onClose, onAdd }) {
 
   const canAdd = selected && Number(shares) > 0 && price !== null && !priceLoading;
 
+  const pad = narrow ? "18px 18px" : "28px 32px";
+  const boxW = narrow ? "min(100vw - 24px, 420px)" : 420;
+
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex",
       alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(8px)",
+      padding: narrow ? 12 : 0,
+      boxSizing: "border-box",
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.surface, border: `1px solid ${C.borderHover}`, borderRadius: 16,
-        padding: "28px 32px", width: 420, boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
+        padding: pad, width: boxW, maxWidth: "100%", maxHeight: narrow ? "min(520px, 92vh)" : "none",
+        overflowY: narrow ? "auto" : "visible",
+        WebkitOverflowScrolling: "touch",
+        boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
         animation: "fadeUp 0.25s ease",
       }}>
         <div style={{ fontSize: 18, fontWeight: 600, color: C.text, fontFamily: FONT, marginBottom: 24 }}>

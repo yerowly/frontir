@@ -90,6 +90,40 @@ It still does the same SHA-256 check (and deletes the file if the hash is wrong)
 
 Some endpoints have hard limits on inputs (tickers count, Monte Carlo sizes, etc.). If you hit a 400, reduce the numbers.
 
+## Cloudflare (optional, custom domain)
+
+Cloudflare sits in front of your DNS and can proxy HTTP(S) (orange cloud) for DDoS filtering and CDN. The app does not need code changes; you wire **DNS + SSL** and update env vars.
+
+### 1. Add the domain in Cloudflare
+
+- Create a Cloudflare account (the **Free** plan is enough to start).
+- **Add a site** → enter your domain → Cloudflare will scan existing DNS.
+- At your **domain registrar**, replace the nameservers with the pair Cloudflare shows (this is what actually “connects” the domain to Cloudflare).
+
+### 2. DNS records (typical: Netlify front + Render API)
+
+Exact targets come from Netlify / Render dashboards when you add custom hostnames.
+
+| Name | Type | Target (example) | Proxy |
+|------|------|------------------|-------|
+| `www` | CNAME | `your-site.netlify.app` | Proxied (orange) |
+| `@` (apex) | CNAME or A | Per Netlify docs (flattening / ALIAS) | Proxied if supported |
+| `api` | CNAME | `your-service.onrender.com` | Proxied (orange) |
+
+In Render and Netlify, add the **same hostnames** as custom domains and complete their DNS checks.
+
+### 3. SSL/TLS mode in Cloudflare
+
+- Use **Full** or **Full (strict)** so HTTPS between browser ↔ Cloudflare ↔ origin works. Both Netlify and Render serve HTTPS on the origin.
+- Avoid **Flexible** with HTTPS origins (often causes redirect loops or odd errors).
+
+### 4. Env vars after you move to `https://yourdomain…`
+
+- **Netlify (build)**: `REACT_APP_API_URL=https://api.yourdomain.com` (or your API hostname).
+- **Render**: `ALLOW_ORIGINS=https://yourdomain.com,https://www.yourdomain.com` (comma-separated, full URLs, no trailing slash issues if you match how the browser sends `Origin`).
+
+CORS does not replace authentication; it only affects browser cross-origin calls.
+
 ## Dev notes
 
 - Don’t commit `venv/`, `.cache/`, etc.

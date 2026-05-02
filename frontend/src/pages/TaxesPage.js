@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C, FONT } from "../theme";
+import { useLayout, padPage } from "../layout";
 import API from "../api";
 
 const REGIMES = [
@@ -115,6 +116,7 @@ function ComparisonChart({ comparison, profit }) {
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function TaxesPage({ holdings = [] }) {
+  const { narrow } = useLayout();
   const [regime,       setRegime]       = useState("kazakhstan");
   const [holdingYears, setHoldingYears] = useState(3);
   const [loading,      setLoading]      = useState(false);
@@ -161,7 +163,7 @@ export default function TaxesPage({ holdings = [] }) {
   const pnlPos = profit >= 0;
 
   return (
-    <div style={{ padding: "20px 28px 40px", fontFamily: FONT }}>
+    <div style={{ padding: padPage(narrow), fontFamily: FONT }}>
       <style>{`
         .tax-range {
           -webkit-appearance: none; appearance: none;
@@ -181,7 +183,12 @@ export default function TaxesPage({ holdings = [] }) {
       `}</style>
 
       {/* ── Portfolio summary ──────────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: narrow ? "1fr" : "repeat(3, 1fr)",
+        gap: 12,
+        marginBottom: 16,
+      }}>
         {[
           {
             label: "Current Value",
@@ -257,7 +264,11 @@ export default function TaxesPage({ holdings = [] }) {
         <div style={{ fontSize: 12, color: C.textDim, marginBottom: 10, fontFamily: FONT }}>
           Tax regime
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: narrow ? "1fr" : "repeat(3, 1fr)",
+          gap: 12,
+        }}>
           {REGIMES.map(r => {
             const a = regime === r.key;
             return (
@@ -369,7 +380,12 @@ export default function TaxesPage({ holdings = [] }) {
         <div style={{ opacity: loading ? 0.55 : 1, transition: "opacity 0.2s" }}>
 
           {/* Stat cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: narrow ? "repeat(2, minmax(0, 1fr))" : "repeat(4, 1fr)",
+            gap: 12,
+            marginBottom: 16,
+          }}>
             {[
               {
                 label: "Gross Profit",

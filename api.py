@@ -18,9 +18,24 @@ from core.model import RegimeModel, smart_optimize
 
 app = FastAPI(title="Frontir API", version="2.0")
 
+def _cors_origins():
+    raw = os.environ.get("ALLOW_ORIGINS", "*").strip()
+    if not raw or raw == "*":
+        return ["*"]
+    parts = [p.strip() for p in raw.split(",")]
+    out = []
+    for p in parts:
+        if not p:
+            continue
+        if not p.startswith("http://") and not p.startswith("https://"):
+            print(f"[cors] bad origin (need full url): {p}")
+            continue
+        out.append(p.rstrip("/"))
+    return out if out else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=_cors_origins(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
