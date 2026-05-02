@@ -19,7 +19,7 @@ HERE = os.path.dirname(__file__)
 MODEL_DIR = os.path.abspath(os.path.join(HERE, "..", "models"))
 
 
-GOLDEN_SHA256 = "08f12c9a7e96a6161fdd6ab76b1be80e43d7acb9048f45c636c0d4183e318141"
+GOLDEN_SHA256 = "a120a4a294849624183a67e6ac88ee9156317e3565dfd1133381b9d9b7f41317"
 
 # TODO: add VIX (or VIX9D) as a separate panic signal
 
