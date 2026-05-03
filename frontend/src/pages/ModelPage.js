@@ -401,7 +401,7 @@ export default function ModelPage({ holdings = [] }) {
                 About this model
               </div>
               <p style={{ fontSize: 11, color: C.textFaint, fontFamily: FONT, lineHeight: 1.7, margin: 0 }}>
-                Uses a Random Forest classifier trained on historical market features: momentum, volatility, rolling correlations, RSI, and drawdown across 5, 10, 21, and 63-day windows. Predicts the current market regime (Bull / Sideways / Bear) and recommends an optimal portfolio strategy for that regime. Strategy mapping: Bull → Max Return, Bear → Min Variance, Sideways → Risk Parity. Cross-validation accuracy ~57%. Predictions are probabilistic and not financial advice.
+                Uses a histogram-based gradient boosting classifier (scikit-learn) on features derived from your positions: momentum and volatility across several windows (including 5–63 day horizons), cross-sectional breadth, drawdown, dispersion, and an RSI-style oscillator. It estimates the current regime among bull, sideways, bear, and panic, then maps it to a strategy: bull → max return, sideways → risk parity, bear or panic → min variance. Outputs are probabilistic and illustrative only — not financial advice.
               </p>
             </div>
           </div>

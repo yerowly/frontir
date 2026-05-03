@@ -56,9 +56,11 @@ streamlit run app.py
 
 - Code: `core/model.py`
 - Model file: `models/regime_model.pkl`
+- **Classifier:** the shipped checkpoint is trained as a **Histogram-based Gradient Boosting** model (`HistGradientBoostingClassifier` in scikit-learn). Training runs when you execute `python -m core/model.py` (see the `__main__` block at the bottom of `core/model.py`).
+- Features are built from your portfolio returns (and optional macro / news columns): momentum and volatility over several windows, breadth, drawdown, RSI-like signals, multi-asset dispersion, etc.
 - Regimes:
   - `0=bear`, `1=sideways`, `2=bull`, `3=panic`
-- Label defaults (current best): `forward_days=21`, `z=0.35`
+- Label defaults used in training: `forward_days=21`, `z=0.35`
 
 ### Train / retrain the model
 
